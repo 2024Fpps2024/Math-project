@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aerial Defense</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000000;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+
+        #game-canvas {
+            border: 1px solid #333;
+            display: block;
+        }
+
+        #ui {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        #start-screen, #shop-screen, #math-challenge, #game-over-screen {
+            display: none;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            color: #ffffff;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+            background-color: #333;
+            color: #ffffff;
+            border: 1px solid #555;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #444;
+        }
+
+        input {
+            padding: 5px;
+            font-size: 16px;
+            background-color: #333;
+            color: #ffffff;
+            border: 1px solid #555;
+            border-radius: 5px;
+        }
+
+        h1, h2 {
+            color: #ffffff;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        #start-screen {
+            background-image: url('home page.jpg');
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-color: #1e3c72; /* 后备颜色 */
+            width: 800px;
+            height: 600px;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            padding: 0;
+            text-align: center;
+            border-radius: 10px;
+            color: #ffffff;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+
+        #game-over-screen {
+            background-image: url('game over page.png');
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-color: #8B0000; /* 后备颜色 */
+            width: 800px;
+            height: 600px;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            border-radius: 10px;
+            color: #ffffff;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+            padding: 0;
+            text-align: center;
+        }
+
+        #shop-screen {
+            background-image: url('upgrade page.jpg');
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-color: #228B22; /* 后备颜色 */
+            width: 800px;
+            height: 600px;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            padding: 0;
+            text-align: center;
+            border-radius: 10px;
+            color: #ffffff;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+
+        .error-message {
+            color: #ff0000;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="game-canvas" width="800" height="600"></canvas>
+    <div id="ui">
+        <div id="start-screen">
+            <h1>Aerial Defense</h1>
+            <p>Use WASD or Arrow Keys to move, Space to shoot, Mouse to aim</p>
+            <button id="start-button">Start Game</button>
+        </div>
+        <div id="shop-screen">
+            <h2>Shop</h2>
+            <p>Coins: <span id="coin-display">0</span></p>
+            <button id="upgrade-fire-rate">Increase Fire Rate (50 coins)</button>
+            <button id="upgrade-health">Increase Max Health (100 coins)</button>
+            <button id="next-wave">Start Next Wave</button>
+        </div>
+        <div id="game-over-screen">
+            <h2>Game Over</h2>
+            <p>You reached Wave <span id="final-wave">1</span></p>
+            <button id="restart-button">Play Again</button>
+        </div>
+        <div id="math-challenge">
+            <p id="math-question">Math Question</p>
+            <input type="text" id="math-input" placeholder="Enter answer (e.g., 5, 2.5, 3/4, 1 3/4)">
+            <button id="math-submit">Submit</button>
+        </div>
+    </div>
+
+    <script>
+        // 错误处理函数
+        function handleError(error) {
+            console.error('Game Error:', error);
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = 'Game loading error: ' + error.message;
+            document.body.appendChild(errorDiv);
+        }
+
+        // 全局错误处理
+        window.addEventListener('error', (event) => {
+            handleError(event.error);
+        });
+
+        // 等待DOM加载完成
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                const canvas = document.getElementById('game-canvas');
+                const ctx = canvas.getContext('2d');
+
+                if (!ctx) {
+                    throw new Error('Unable to get Canvas context');
+                }
+
+                // UI elements
+                const ui = document.getElementById('ui');
+                const startScreen = document.getElementById('start-screen');
+                const shopScreen = document.getElementById('shop-screen');
+                const gameOverScreen = document.getElementById('game-over-screen');
+                const mathChallengeScreen = document.getElementById('math-challenge');
+                const coinDisplay = document.getElementById('coin-display');
+                const finalWaveDisplay = document.getElementById('final-wave');
+                const startButton = document.getElementById('start-button');
+                const nextWaveButton = document.getElementById('next-wave');
+                const restartButton = document.getElementById('restart-button');
+                const upgradeFireRateButton = document.getElementById('upgrade-fire-rate');
+                const upgradeHealthButton = document.getElementById('upgrade-health');
+
+                // Game variables
+                const plane = {
+                    x: canvas.width / 2,
+                    y: canvas.height / 2,
+                    health: 500,
+                    maxHealth: 500,
+                    coins: 0,
+                    fireRate: 1000,
+                    speed: 3,
+                    lastShot: 0,
+                    angle: 0,
+                    image: new Image()
+                };
+
+                // 创建默认飞机图像（如果图片加载失败）
+                plane.image.onerror = () => {
+                    console.warn('Plane image failed to load, using default graphics');
+                    plane.image = null;
+                };
+                plane.image.src = 'plane4.png';
+
+                const monsters = [];
+                const bullets = [];
+                const obstacles = [];
+                const keys = {};
+                const mathChallenge = {
+                    active: false,
+                    question: '',
+                    answer: 0,
+                    timer: 10,
+                    pauseTimer: 3
+                };
+
+                let currentState = 'start';
+                let waveNumber = 1;
+                let mathTimer = null;
+                let isPaused = false;
+
+                // 创建默认怪物图像
+                const createDefaultMonsterImage = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 40;
+                    canvas.height = 40;
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(0, 0, 40, 40);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(10, 10, 20, 20);
+                    return canvas;
+                };
+
+                const defaultMonsterImage = createDefaultMonsterImage();
+
+                // 预加载背景图片
+                const backgroundImages = [
+                    { element: startScreen, src: 'home page.jpg' },
+                    { element: gameOverScreen, src: 'game over page.png' },
+                    { element: shopScreen, src: 'upgrade page.jpg' }
+                ];
+
+                backgroundImages.forEach(({ element, src }) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        console.log(`Background image ${src} loaded successfully`);
+                    };
+                    img.onerror = () => {
+                        console.warn(`Background image ${src} failed to load, using default background color`);
+                        // 图片加载失败时，CSS会自动使用background-color作为后备
+                    };
+                    img.src = src;
+                });
+
+                // 预加载怪物图像
+                const monsterImages = [
+                    'monster1.png',
+                    'monster2.png',
+                    'monster3.png',
+                    'monster4.png'
+                ].map(src => {
+                    const img = new Image();
+                    img.onerror = () => {
+                        console.warn(`Monster image ${src} failed to load, using default graphics`);
+                        img.src = defaultMonsterImage.toDataURL();
+                    };
+                    img.src = src;
+                    return img;
+                });
+
+                // Input handling
+                document.addEventListener('keydown', (e) => keys[e.key] = true);
+                document.addEventListener('keyup', (e) => keys[e.key] = false);
+                document.addEventListener('mousemove', (e) => {
+                    const rect = canvas.getBoundingClientRect();
+                    plane.aimX = e.clientX - rect.left;
+                    plane.aimY = e.clientY - rect.top;
+                });
+                document.addEventListener('keydown', (e) => {
+                    if (e.code === 'Space' && currentState === 'playing' && !mathChallenge.active) {
+                        shoot();
+                    }
+                });
+
+                // State management
+                function setState(newState) {
+                    currentState = newState;
+                    startScreen.style.display = 'none';
+                    shopScreen.style.display = 'none';
+                    gameOverScreen.style.display = 'none';
+                    mathChallengeScreen.style.display = 'none';
+                    
+                    switch (currentState) {
+                        case 'start':
+                            startScreen.style.display = 'block';
+                            resetGame();
+                            break;
+                        case 'playing':
+                            spawnWave();
+                            break;
+                        case 'shop':
+                            shopScreen.style.display = 'block';
+                            coinDisplay.textContent = plane.coins;
+                            break;
+                        case 'gameOver':
+                            gameOverScreen.style.display = 'block';
+                            finalWaveDisplay.textContent = waveNumber;
+                            break;
+                    }
+                }
+
+                // Reset game
+                function resetGame() {
+                    plane.x = canvas.width / 2;
+                    plane.y = canvas.height / 2;
+                    plane.health = 500;
+                    plane.maxHealth = 500;
+                    plane.coins = 0;
+                    plane.fireRate = 1000;
+                    waveNumber = 1;
+                    monsters.length = 0;
+                    bullets.length = 0;
+                    obstacles.length = 0;
+                }
+
+                // 添加检查位置是否在障碍物内的函数
+                function isPositionInObstacle(x, y) {
+                    return obstacles.some(o => {
+                        return x >= o.x && x <= o.x + o.width &&
+                               y >= o.y && y <= o.y + o.height;
+                    });
+                }
+
+                // Enhanced: check if a position is stuck (no free space around)
+                function isStuck(x, y, margin = 25) {
+                    const checks = [
+                        {dx: 0, dy: -margin},
+                        {dx: 0, dy: margin},
+                        {dx: -margin, dy: 0},
+                        {dx: margin, dy: 0}
+                    ];
+                    return checks.every(({dx, dy}) => isPositionInObstacle(x + dx, y + dy));
+                }
+
+                // Enhanced getSafePosition: not in obstacle and not stuck
+                function getSafePosition() {
+                    let x, y;
+                    let tries = 0;
+                    do {
+                        x = Math.random() * (canvas.width - 40) + 20;
+                        y = Math.random() * (canvas.height - 40) + 20;
+                        tries++;
+                        if (tries > 1000) break;
+                    } while (isPositionInObstacle(x, y) || isStuck(x, y));
+                    return { x, y };
+                }
+
+                // 修改spawnWave函数
+                function spawnWave() {
+                    monsters.length = 0;
+                    obstacles.length = 0;
+                    plane.health = plane.maxHealth;
+                    
+                    // 先生成障碍物
+                    const obstacleCount = 2 + waveNumber;
+                    for (let i = 0; i < obstacleCount; i++) {
+                        obstacles.push({
+                            x: Math.random() * (canvas.width - 50),
+                            y: Math.random() * (canvas.height - 50),
+                            width: 50,
+                            height: 50
+                        });
+                    }
+
+                    // 生成怪物
+                    const monsterCount = 5 + waveNumber * 1;
+                    for (let i = 0; i < monsterCount; i++) {
+                        const safePos = getSafePosition();
+                        monsters.push({
+                            x: safePos.x,
+                            y: safePos.y,
+                            health: 20 + waveNumber * 5,
+                            speed: 0.2 + waveNumber * 0.08,
+                            angle: 0,
+                            image: monsterImages[Math.floor(Math.random() * monsterImages.length)]
+                        });
+                    }
+
+                    // 设置飞机的安全位置
+                    const safePos = getSafePosition();
+                    plane.x = safePos.x;
+                    plane.y = safePos.y;
+                }
+
+                // Find closest monster
+                function findClosestMonster() {
+                    let closest = null;
+                    let minDist = Infinity;
+                    monsters.forEach(m => {
+                        const dx = m.x - plane.x;
+                        const dy = m.y - plane.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            closest = m;
+                        }
+                    });
+                    return closest;
+                }
+
+                // Shoot bullets
+                function shoot() {
+                    if (mathChallenge.active) return;
+                    const now = Date.now();
+                    if (now - plane.lastShot >= plane.fireRate) {
+                        const dx = plane.aimX - plane.x;
+                        const dy = plane.aimY - plane.y;
+                        const angle = Math.atan2(dy, dx);
+                        bullets.push({
+                            x: plane.x,
+                            y: plane.y,
+                            dx: Math.cos(angle) * 20,
+                            dy: Math.sin(angle) * 20,
+                            trail: [],
+                            maxTrailLength: 5
+                        });
+                        plane.lastShot = now;
+                    }
+                }
+
+                // Collision detection
+                function collides(a, b) {
+                    return a.x < b.x + b.width && a.x + a.width > b.x &&
+                           a.y < b.y + b.height && a.y + a.height > b.y;
+                }
+
+                // Math challenge functions
+                function parseAnswer(input) {
+                    input = input.trim();
+                    
+                    // Check if it's a mixed number (e.g., "1 3/4" or "1_3/4")
+                    if (input.includes(' ') || input.includes('_')) {
+                        const separator = input.includes(' ') ? ' ' : '_';
+                        const parts = input.split(separator);
+                        if (parts.length === 2) {
+                            const wholePart = parseFloat(parts[0]);
+                            const fractionPart = parts[1];
+                            
+                            if (!isNaN(wholePart) && fractionPart.includes('/')) {
+                                const fractionParts = fractionPart.split('/');
+                                if (fractionParts.length === 2) {
+                                    const numerator = parseFloat(fractionParts[0]);
+                                    const denominator = parseFloat(fractionParts[1]);
+                                    if (!isNaN(numerator) && !isNaN(denominator) && denominator !== 0) {
+                                        return wholePart + (numerator / denominator);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Check if it's a fraction (e.g., "3/4" or "5/3")
+                    if (input.includes('/')) {
+                        const parts = input.split('/');
+                        if (parts.length === 2) {
+                            const numerator = parseFloat(parts[0]);
+                            const denominator = parseFloat(parts[1]);
+                            if (!isNaN(numerator) && !isNaN(denominator) && denominator !== 0) {
+                                return numerator / denominator;
+                            }
+                        }
+                    }
+                    
+                    // Check if it's a decimal or integer
+                    const num = parseFloat(input);
+                    return isNaN(num) ? null : num;
+                }
+
+                function generateMathQuestion() {
+                    const num1 = Math.floor(Math.random() * 10) + 1;
+                    const num2 = Math.floor(Math.random() * 10) + 1;
+                    const operators = ['+', '-', '*'];
+                    const operator = operators[Math.floor(Math.random() * operators.length)];
+                    let question, answer;
+                    if (operator === '-') {
+                        if (num1 < num2) {
+                            question = `${num2} ${operator} ${num1}`;
+                            answer = num2 - num1;
+                        } else {
+                            question = `${num1} ${operator} ${num2}`;
+                            answer = num1 - num2;
+                        }
+                    } else {
+                        question = `${num1} ${operator} ${num2}`;
+                        answer = eval(question);
+                    }
+                    
+                    if (Math.random() < 0.3) {
+                        const den1 = Math.floor(Math.random() * 4) + 1;
+                        const den2 = Math.floor(Math.random() * 4) + 1;
+                        const num1 = Math.floor(Math.random() * 3) + 1;
+                        const num2 = Math.floor(Math.random() * 3) + 1;
+                        question = `${num1}/${den1} + ${num2}/${den2}`;
+                        answer = (num1 * den2 + num2 * den1) / (den1 * den2);
+                        if (answer % 1 === 0) {
+                            answer = Math.floor(answer);
+                        }
+                    }
+                    mathChallenge.question = question;
+                    mathChallenge.answer = answer;
+                    document.getElementById('math-question').textContent = mathChallenge.question;
+                }
+
+                function startMathChallenge() {
+                    mathChallenge.active = true;
+                    generateMathQuestion();
+                    mathChallenge.timer = 10;
+                    mathChallengeScreen.style.display = 'block';
+                    document.getElementById('math-input').value = '';
+                    mathTimer = setInterval(() => {
+                        mathChallenge.timer--;
+                        if (mathChallenge.timer <= 0) {
+                            endMathChallenge(false);
+                        }
+                    }, 1000);
+                }
+
+                function endMathChallenge(success) {
+                    clearInterval(mathTimer);
+                    mathChallenge.active = false;
+                    mathChallengeScreen.style.display = 'none';
+                    if (!success) {
+                        plane.health -= 50;
+                    }
+                }
+
+                // Event listeners for math challenge
+                document.getElementById('math-submit').addEventListener('click', () => {
+                    const answer = parseAnswer(document.getElementById('math-input').value);
+                    if (answer === null) {
+                        alert('Please enter a valid answer (e.g., 5, 2.5, 3/4, 1 3/4)');
+                        return;
+                    }
+                    endMathChallenge(Math.abs(answer - mathChallenge.answer) < 0.01);
+                });
+
+                document.getElementById('math-input').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        const answer = parseAnswer(document.getElementById('math-input').value);
+                        if (answer === null) {
+                            alert('Please enter a valid answer (e.g., 5, 2.5, 3/4, 1 3/4)');
+                            return;
+                        }
+                        endMathChallenge(Math.abs(answer - mathChallenge.answer) < 0.01);
+                    }
+                });
+
+                // Update monster death logic
+                function handleMonsterDeath(monster, index) {
+                    monsters.splice(index, 1);
+                    plane.coins += 50;
+                    coinDisplay.textContent = plane.coins;
+                    startMathChallenge();
+                }
+
+                // Update game state
+                function update() {
+                    if (currentState !== 'playing') return;
+
+                    // Plane movement
+                    if (!mathChallenge.active) {
+                        let moved = false;
+                        if (keys['ArrowUp'] || keys['w']) {
+                            plane.y -= plane.speed;
+                            moved = true;
+                        }
+                        if (keys['ArrowDown'] || keys['s']) {
+                            plane.y += plane.speed;
+                            moved = true;
+                        }
+                        if (keys['ArrowLeft'] || keys['a']) {
+                            plane.x -= plane.speed;
+                            moved = true;
+                        }
+                        if (keys['ArrowRight'] || keys['d']) {
+                            plane.x += plane.speed;
+                            moved = true;
+                        }
+                        
+                        if (plane.aimX && plane.aimY) {
+                            const dx = plane.aimX - plane.x;
+                            const dy = plane.aimY - plane.y;
+                            plane.angle = Math.atan2(dy, dx) + Math.PI / 2;
+                        }
+                        
+                        plane.x = Math.max(10, Math.min(canvas.width - 10, plane.x));
+                        plane.y = Math.max(10, Math.min(canvas.height - 10, plane.y));
+                    }
+
+                    // Update bullets
+                    for (let i = bullets.length - 1; i >= 0; i--) {
+                        const b = bullets[i];
+                        b.x += b.dx;
+                        b.y += b.dy;
+
+                        b.trail.push({ x: b.x, y: b.y });
+                        if (b.trail.length > b.maxTrailLength) {
+                            b.trail.shift();
+                        }
+
+                        if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
+                            bullets.splice(i, 1);
+                            continue;
+                        }
+
+                        for (const o of obstacles) {
+                            if (collides({ x: b.x, y: b.y, width: 5, height: 5 }, o)) {
+                                bullets.splice(i, 1);
+                                break;
+                            }
+                        }
+
+                        for (let j = monsters.length - 1; j >= 0; j--) {
+                            const m = monsters[j];
+                            if (collides({ x: b.x, y: b.y, width: 5, height: 5 }, { x: m.x, y: m.y, width: 20, height: 20 })) {
+                                m.health -= 10;
+                                bullets.splice(i, 1);
+                                if (m.health <= 0) {
+                                    handleMonsterDeath(m, j);
+                                    if (monsters.length === 0) {
+                                        setState('shop');
+                                        return;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+
+                    // Monster movement and obstacle collision
+                    monsters.forEach(m => {
+                        const dx = plane.x - m.x;
+                        const dy = plane.y - m.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        let newX = m.x + (dx / dist) * m.speed * 1.1;
+                        let newY = m.y + (dy / dist) * m.speed * 1.1;
+                        
+                        let willCollide = false;
+                        for (const o of obstacles) {
+                            if (collides({ x: newX - 10, y: newY - 10, width: 20, height: 20 }, o)) {
+                                willCollide = true;
+                                break;
+                            }
+                        }
+                        if (!willCollide) {
+                            m.x = newX;
+                            m.y = newY;
+                        }
+
+                        if (dist < 20) {
+                            plane.health -= (0.1 + waveNumber * 0.15);
+                        }
+                    });
+
+                    // Plane obstacle collision
+                    obstacles.forEach(o => {
+                        if (collides({ x: plane.x - 10, y: plane.y - 10, width: 20, height: 20 }, o)) {
+                            if (keys['ArrowUp'] || keys['w']) plane.y += plane.speed;
+                            if (keys['ArrowDown'] || keys['s']) plane.y -= plane.speed;
+                            if (keys['ArrowLeft'] || keys['a']) plane.x += plane.speed;
+                            if (keys['ArrowRight'] || keys['d']) plane.x -= plane.speed;
+                        }
+                    });
+
+                    // Check for game over
+                    if (plane.health <= 0) {
+                        setState('gameOver');
+                    }
+                }
+
+                // Render function
+                function render() {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    // Draw plane with rotation
+                    ctx.save();
+                    ctx.translate(plane.x, plane.y);
+                    ctx.rotate(plane.angle);
+                    
+                    if (plane.image && plane.image.complete) {
+                        ctx.drawImage(plane.image, -40, -40, 80, 80);
+                    } else {
+                        // 绘制默认飞机图形
+                        ctx.fillStyle = '#00ff00';
+                        ctx.fillRect(-20, -30, 40, 60);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(-10, -20, 20, 40);
+                    }
+                    ctx.restore();
+
+                    // Health bar
+                    ctx.fillStyle = '#00ff00';
+                    ctx.fillRect(plane.x - 20, plane.y - 55, (plane.health / plane.maxHealth) * 40, 5);
+
+                    // Add shooting direction dashed line
+                    if (plane.aimX && plane.aimY) {
+                        ctx.setLineDash([5, 5]);
+                        ctx.beginPath();
+                        ctx.moveTo(plane.x, plane.y);
+                        ctx.lineTo(plane.aimX, plane.aimY);
+                        ctx.strokeStyle = 'rgba(255, 165, 0, 0.3)';
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+
+                    // Draw monsters with rotation
+                    monsters.forEach(m => {
+                        ctx.save();
+                        ctx.translate(m.x, m.y);
+                        if (m.image && m.image.complete) {
+                            ctx.drawImage(m.image, -20, -20, 40, 40);
+                        } else {
+                            // 绘制默认怪物图形
+                            ctx.fillStyle = '#ff0000';
+                            ctx.fillRect(-20, -20, 40, 40);
+                            ctx.fillStyle = '#ffffff';
+                            ctx.fillRect(-10, -10, 20, 20);
+                        }
+                        ctx.restore();
+                        
+                        // Health bar
+                        ctx.fillStyle = '#00ff00';
+                        ctx.fillRect(m.x - 10, m.y - 15, (m.health / (20 + waveNumber * 5)) * 20, 5);
+                    });
+
+                    // Draw bullets with trails
+                    bullets.forEach(b => {
+                        b.trail.forEach((pos, index) => {
+                            const alpha = (index + 1) / b.trail.length;
+                            ctx.fillStyle = `rgba(255, 255, 0, ${alpha * 0.5})`;
+                            ctx.beginPath();
+                            ctx.arc(pos.x, pos.y, 2, 0, Math.PI * 2);
+                            ctx.fill();
+                        });
+
+                        ctx.fillStyle = '#ffff00';
+                        ctx.beginPath();
+                        ctx.arc(b.x, b.y, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+
+                    // Draw obstacles
+                    obstacles.forEach(o => {
+                        ctx.fillStyle = '#666666';
+                        ctx.fillRect(o.x, o.y, o.width, o.height);
+                    });
+
+                    // State-specific rendering
+                    if (currentState === 'playing') {
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = '20px Arial';
+                        ctx.fillText(`Wave ${waveNumber} | Health: ${Math.floor(plane.health)} | Coins: ${plane.coins}`, 10, 30);
+                    }
+                }
+
+                // Game loop
+                function gameLoop() {
+                    try {
+                        update();
+                        render();
+                        requestAnimationFrame(gameLoop);
+                    } catch (error) {
+                        handleError(error);
+                    }
+                }
+
+                // Event listeners
+                startButton.addEventListener('click', () => {
+                    setState('playing');
+                });
+                nextWaveButton.addEventListener('click', () => {
+                    waveNumber++;
+                    setState('playing');
+                });
+                restartButton.addEventListener('click', () => {
+                    setState('start');
+                });
+                upgradeFireRateButton.addEventListener('click', () => {
+                    if (plane.coins >= 50) {
+                        plane.coins -= 50;
+                        plane.fireRate *= 0.9;
+                        coinDisplay.textContent = plane.coins;
+                    } else alert('Not enough coins!');
+                });
+                upgradeHealthButton.addEventListener('click', () => {
+                    if (plane.coins >= 100) {
+                        plane.coins -= 100;
+                        plane.maxHealth += 20;
+                        plane.health = plane.maxHealth;
+                        coinDisplay.textContent = plane.coins;
+                    } else alert('Not enough coins!');
+                });
+
+                // Start the game
+                gameLoop();
+                setState('start');
+                
+            } catch (error) {
+                handleError(error);
+            }
+        });
+    </script>
+</body>
+</html>

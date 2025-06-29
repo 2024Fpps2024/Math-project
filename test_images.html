@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #000;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        .test-container {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #333;
+            border-radius: 10px;
+        }
+        .image-test {
+            width: 400px;
+            height: 300px;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            border: 1px solid #666;
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            font-weight: bold;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #4CAF50;
+        }
+        .error {
+            background-color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <h1>背景图片加载测试</h1>
+    
+    <div class="test-container">
+        <h2>首页背景图片</h2>
+        <div id="home-test" class="image-test" style="background-image: url('home page.jpg');">
+            首页背景
+        </div>
+        <div id="home-status" class="status">检查中...</div>
+    </div>
+
+    <div class="test-container">
+        <h2>游戏结束背景图片</h2>
+        <div id="gameover-test" class="image-test" style="background-image: url('game over page.png');">
+            游戏结束背景
+        </div>
+        <div id="gameover-status" class="status">检查中...</div>
+    </div>
+
+    <div class="test-container">
+        <h2>商店背景图片</h2>
+        <div id="shop-test" class="image-test" style="background-image: url('upgrade page.jpg');">
+            商店背景
+        </div>
+        <div id="shop-status" class="status">检查中...</div>
+    </div>
+
+    <script>
+        function testImage(src, statusElement) {
+            const img = new Image();
+            img.onload = () => {
+                statusElement.textContent = '✅ 图片加载成功';
+                statusElement.className = 'status success';
+            };
+            img.onerror = () => {
+                statusElement.textContent = '❌ 图片加载失败';
+                statusElement.className = 'status error';
+            };
+            img.src = src;
+        }
+
+        // 测试所有图片
+        testImage('home page.jpg', document.getElementById('home-status'));
+        testImage('game over page.png', document.getElementById('gameover-status'));
+        testImage('upgrade page.jpg', document.getElementById('shop-status'));
+    </script>
+</body>
+</html> 
